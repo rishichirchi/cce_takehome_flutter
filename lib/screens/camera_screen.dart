@@ -19,7 +19,6 @@ class CameraScreenState extends State<CameraScreen> {
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
 
-  // Face detection related variables
   List<Face> _faces = [];
   late FaceDetector _faceDetector;
   File? _lastImage;
@@ -28,7 +27,6 @@ class CameraScreenState extends State<CameraScreen> {
   @override
   void initState() {
     super.initState();
-    // Initialize the face detector
     final options = FaceDetectorOptions(
       enableClassification: true,
       enableTracking: true,
@@ -59,13 +57,11 @@ class CameraScreenState extends State<CameraScreen> {
       _isCameraInitialized = true;
     });
 
-    // Start the face detection timer
     _startFaceDetectionTimer();
   }
 
   void _startFaceDetectionTimer() {
-    // Process image every 500ms
-    _detectionTimer = Timer.periodic(Duration(milliseconds: 500), (timer) {
+    _detectionTimer = Timer.periodic(Duration(milliseconds: 300), (timer) {
       if (!_isProcessing && _cameraController.value.isInitialized) {
         _captureAndDetectFaces();
       }
@@ -77,16 +73,12 @@ class CameraScreenState extends State<CameraScreen> {
     _isProcessing = true;
 
     try {
-      // Take a picture
       final XFile file = await _cameraController.takePicture();
 
-      // Convert to file for processing
       _lastImage = File(file.path);
 
-      // Create InputImage from file
       final inputImage = InputImage.fromFile(_lastImage!);
 
-      // Process the image
       await _detectFaces(inputImage);
     } catch (e) {
       log("Error capturing image: $e");
@@ -157,18 +149,16 @@ class CameraScreenState extends State<CameraScreen> {
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // Camera preview
           CameraPreview(_cameraController),
 
-          // Face bounding boxes overlay
           CustomPaint(
             painter: FacePainter(
               faces: _faces,
               imageSize: Size(
                 _cameraController.value.previewSize!
-                    .height, // Note: might need to swap width/height
+                    .height, 
                 _cameraController
-                    .value.previewSize!.width, // depending on orientation
+                    .value.previewSize!.width, 
               ),
               screenSize: MediaQuery.of(context).size,
               isFrontCamera: _cameraController.description.lensDirection ==
@@ -225,20 +215,17 @@ class FacePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     if (imageSize.width == 0 || imageSize.height == 0) return;
-    // For camera preview, we need to handle the aspect ratio differences
-    // and potential rotation between the camera image and the screen
+
     final double imageAspectRatio = imageSize.width / imageSize.height;
     final double screenAspectRatio = screenSize.width / screenSize.height;
 
     double scaleX, scaleY, offsetX = 0, offsetY = 0;
 
-    // Account for the fact that camera preview might be rotated 90 degrees
     final bool isPortraitMode = screenSize.height > screenSize.width;
     final bool needRotation = (isPortraitMode && imageAspectRatio > 1) ||
         (!isPortraitMode && imageAspectRatio < 1);
 
     if (needRotation) {
-      // If image is rotated 90 degrees
       scaleX = screenSize.width / imageSize.height;
       scaleY = screenSize.height / imageSize.width;
     } else {
@@ -246,7 +233,6 @@ class FacePainter extends CustomPainter {
       scaleY = screenSize.height / imageSize.height;
     }
 
-    // Use the smaller scale to fit the entire image
     final double scale = math.min(scaleX, scaleY);
 
     // Center the image
@@ -264,17 +250,14 @@ class FacePainter extends CustomPainter {
     for (final face in faces) {
       Rect rect = face.boundingBox;
 
-      // Mirror the bounding box horizontally if using front camera
       if (isFrontCamera) {
         final left = imageSize.width - rect.right;
         final right = imageSize.width - rect.left;
         rect = Rect.fromLTRB(left, rect.top, right, rect.bottom);
       }
 
-      // Apply rotation if needed
       Rect scaledRect;
       if (needRotation) {
-        // Swap and transform coordinates for 90-degree rotation
         final double rotatedLeft = rect.top;
         final double rotatedTop = imageSize.width - rect.right;
         final double rotatedWidth = rect.height;
@@ -287,7 +270,6 @@ class FacePainter extends CustomPainter {
           rotatedHeight * scale,
         );
       } else {
-        // Normal scaling without rotation
         scaledRect = Rect.fromLTWH(
           rect.left * scale + offsetX,
           rect.top * scale + offsetY,

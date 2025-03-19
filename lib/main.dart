@@ -1,16 +1,30 @@
 import 'package:face_detector/screens/home_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:flutter_gemini/flutter_gemini.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-void main() async {
+Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
-  await SystemChrome.setPreferredOrientations([
-    DeviceOrientation.portraitUp,
-    DeviceOrientation.portraitDown,
-  ]);
-  
-  runApp(MyApp());
+
+  try {
+    await dotenv.load(fileName: ".env");
+    var geminiApiKey = dotenv.env['GEMINI_API_KEY'];
+    if (geminiApiKey == null) {
+      throw Exception("GEMINI_API_KEY is not set in .env file");
+    }
+    Gemini.init(apiKey: geminiApiKey);
+
+    await SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
+  } catch (e) {
+    throw Exception("Failed to initialize the app: $e");
+  }
+
+  runApp(ProviderScope(child: MyApp()));
 }
 
 class MyApp extends StatelessWidget {
@@ -29,4 +43,3 @@ class MyApp extends StatelessWidget {
     );
   }
 }
-

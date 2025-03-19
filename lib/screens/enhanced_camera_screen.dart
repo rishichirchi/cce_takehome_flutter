@@ -3,14 +3,17 @@ import 'dart:io';
 import 'dart:developer';
 
 import 'package:camera/camera.dart';
+import 'package:face_detector/provider/emotion_provider.dart';
+import 'package:face_detector/service/api_service.dart';
 import 'package:face_detector/utils/enhanced_face_painter.dart';
 import 'package:face_detector/widget/face_condition_overlay.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
 
 import '../utils/face_condition_detector.dart';
 
-class EnhancedCameraScreen extends StatefulWidget {
+class EnhancedCameraScreen extends ConsumerStatefulWidget {
   final bool showDebugInfo;
 
   const EnhancedCameraScreen({
@@ -22,12 +25,14 @@ class EnhancedCameraScreen extends StatefulWidget {
   EnhancedCameraScreenState createState() => EnhancedCameraScreenState();
 }
 
-class EnhancedCameraScreenState extends State<EnhancedCameraScreen>
+class EnhancedCameraScreenState extends ConsumerState<EnhancedCameraScreen>
     with WidgetsBindingObserver {
   late CameraController _cameraController;
   late List<CameraDescription> _cameras;
   bool _isCameraInitialized = false;
   bool _isProcessing = false;
+
+  ApiService apiService = ApiService();
 
   List<Face> _faces = [];
   late FaceDetector _faceDetector;
@@ -38,6 +43,11 @@ class EnhancedCameraScreenState extends State<EnhancedCameraScreen>
   Map<String, String> _faceCondition = {
     'expression': 'Neutral',
     'lighting': 'Normal'
+  };
+
+  Map<String, String> emotionCondition = {
+    'expression': 'Neutral',
+    'lighting': 'Normal',
   };
 
   double _avgBrightness = 0.5;
@@ -130,7 +140,7 @@ class EnhancedCameraScreenState extends State<EnhancedCameraScreen>
       _avgBrightness =
           await FaceConditionDetector.calculateImageBrightness(inputImage);
 
-      await _detectAndAnalyzeFace(inputImage);
+      await _detectAndAnalyzeFace(inputImage, file.path);
     } catch (e) {
       log("Error capturing image: $e");
     } finally {
@@ -146,12 +156,21 @@ class EnhancedCameraScreenState extends State<EnhancedCameraScreen>
     }
   }
 
-  Future<void> _detectAndAnalyzeFace(InputImage inputImage) async {
+  Future<void> _detectAndAnalyzeFace(
+      InputImage inputImage, String imagePath) async {
     try {
       final enhancedInputImage = ImageProcessingExtensions.enhanceForLighting(
           inputImage, _faceCondition['lighting'] ?? 'Normal');
 
       final faces = await _faceDetector.processImage(enhancedInputImage);
+
+      var emotion = await apiService.analyzeEmotion(imagePath, faces.first);
+
+      ref.read(emotionProvider.notifier).setEmotion(emotion!);
+
+      setState(() {
+        emotionCondition['expression'] = ref.watch(emotionProvider);
+      });
 
       if (mounted) {
         setState(() {
@@ -277,7 +296,6 @@ class EnhancedCameraScreenState extends State<EnhancedCameraScreen>
         fit: StackFit.expand,
         children: [
           CameraPreview(_cameraController),
-
           CustomPaint(
             painter: EnhancedFacePainter(
               faces: _faces,
@@ -292,7 +310,7 @@ class EnhancedCameraScreenState extends State<EnhancedCameraScreen>
             ),
           ),
           FaceConditionOverlay(
-            condition: _faceCondition,
+            condition: emotionCondition,
             showDebugInfo: widget.showDebugInfo,
           ),
           Positioned(
